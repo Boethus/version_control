@@ -23,7 +23,13 @@ value_threshold=240
 coins = ["2po","1po","50pe","20pe","10pe","5pe","2pe","1pe"]
 
 def gaussian_convolution(array,size):
-    """Convolves array with a gaussian mask of size pixels."""
+    """Method for blurring an image with a gaussian kernel
+    
+    :param np.ndarray array: 2D array to convolve
+    :param int size: size of the gaussian kernel 
+    :return:
+        np.ndarray out: image convolved
+    """
     x,y=np.ogrid[-size//2:size//2,-size//2:size//2]
     d2=x**2+y**2
     d2 = np.exp(-d2/(size/2)**2 )
@@ -33,7 +39,12 @@ def gaussian_convolution(array,size):
 
     
 def fillHoles(thresh):
-    """fills the holes inside a thresholded image by finding and filling its contours"""
+    """Fils the holes in a thresholded image, basing on contours 
+    detection and filling.
+    
+    :param np.ndarray thresh: 2D array (type uint8, values =0 or 255)
+    :return:
+        np.ndarray image: image with no holes"""
     image,contour,hier = cv2.findContours(thresh,cv2.RETR_CCOMP,cv2.CHAIN_APPROX_SIMPLE)
 
     i=0
@@ -43,8 +54,14 @@ def fillHoles(thresh):
     return image
     
 def centroid(array,value):
-    """This function computes the centroid of the points equals to value in array.
-    returns a list containing the coordinates of the centroid"""
+    """Computes the centroid of a certain group of points in a segmented image
+    
+    :param np.ndarray array: 2D segmented image. All points of an identical 
+        segment have the same value
+    :param int value: value of the points corresponding to the segment of interest
+    :return:
+        list coordinates: coordinates of the centroid
+        """
     coordinates = np.where(array==value)
     number_of_points = len(coordinates[0])
     x = np.sum(coordinates[0])/number_of_points
@@ -52,6 +69,13 @@ def centroid(array,value):
     return [x,y]
     
 def watershed_segmentation(img,thresh):
+    """Watershed segmentation algorithm.
+    
+    :param np.ndarray img: image to be segmented
+    :param np.ndarray thresh: thresholded image
+    :return:
+        np.ndarray markers: image segmented
+        int nr_objects: number of objects detected"""
     thresh=thresh/np.max(thresh)
     thresh=thresh.astype(np.uint8)
     kernel = np.ones((3,3), np.uint8)
@@ -80,6 +104,11 @@ def watershed_segmentation(img,thresh):
     return markers,nr_objects
     
 def labelPoint(array,point):
+    """Displays a square of side size 5 at the location point in array.
+    
+    :param np.ndarray array: image to be labeled
+    :param list point: 2-elements list containing the coordinates 
+        of the point to label"""
     size=5
     #use these min and max variables to avoid indexes out of range in the edges
     min_x=max(0,point[0]-size)
@@ -89,13 +118,26 @@ def labelPoint(array,point):
     array[min_x:max_x,min_y:max_y]=np.ones((max_x-min_x,max_y-min_y))*5.5
     
 def area(array,value):
+    """Computes the area (in pixels) of an object in a segmented image.
+    
+    :param np.nadrray array: segmented image
+    :param int value: value of the group of the pixels of interest.
+    :return:
+        int area: the area of value in array, in pixels
+    """
     val = np.zeros(array.shape)
     val[array==value]=1
     return np.sum(val)
 
 def coinsFromLabels(labeled_image,coin_labels):
-    """Returns an image labeling only the coins from an image with different labels and the list of
-    labels corresponding to coins"""
+    """Returns an image labeling only the coins from a segmented image with different 
+    labels and the list of labels corresponding to coins
+
+    :param np.ndarray labeled_image: segmented image    
+    :param list coin_labels: list containing the labels of the coins
+    :return:
+        np.ndarray new_image: image containing only the coins
+    """
     
     new_image = np.zeros(labeled_image.shape)
     for u in range(len(coin_labels)):
@@ -103,11 +145,19 @@ def coinsFromLabels(labeled_image,coin_labels):
     return new_image
 
 def findObjects(image):
-    """image: bgr image. 
-    Returns: centroid:  list containing the coordinates of 
-    the centres of the different objects detected in the image.
-    nr_objects:the number of objects found
-    labeled: the image with the different objects labeled"""
+    """
+    Finds coins in a bgr image.
+    
+    :param np.ndarray image: 3D array, BGR image
+    :return: 
+        list centroid:  list containing the coordinates of 
+        the centres of the different objects detected in the image.
+        np.ndarray labeled: the segmented array containing the position of the 
+        different objects
+        list coin_labels: a list containing the values of the objects corresponding
+        to a coin
+        list areas: contains the areas of the corresponding coins
+    """
     grey_im=cv2.cvtColor(image, cv2.COLOR_BGR2GRAY )
     grey_im = gaussian_convolution(grey_im,gaussian_kernel_size)
     grey_im = grey_im.astype(np.uint8)
@@ -143,7 +193,13 @@ def findObjects(image):
     return centroids,labeled,coin_labels,areas
 
 def identify_from_size(size,colour):
-    """Indentifies a coin from its size and colour once identified"""
+    """Indentifies a coin from its size and colour once located and its colour 
+    determined
+    
+    :param int size: area in pixels of the coin
+    :param float colour: mean Saturation value of the coin
+    :return:
+        str coin: the name of the coin detected"""
     sizes = np.load("coin_areas.npy")
 
     yellow_areas=sizes[0:2]
@@ -164,6 +220,16 @@ def identify_from_size(size,colour):
         return coins[index]
         
 def identifyColour(image,labeled,mask_value,area):
+    """Identifies the colour of an object and associates to one among three groups:
+    the grey coins (5,10,20 and 50 pence), the yellow coins (1 and 2 pounds) and
+    the red coins (1 and 2 pence)
+    
+    :param np.ndarray image: BGR image in which coins are to be identified
+    :param np.ndarray labeled: segmented image
+    :param int mask_value: identifier for the region of interest
+    :param int area: area in pixels of the region of interest
+    :return:
+        str colour: the name of the colour determined"""
     score = colour_score.colour_score(image, labeled, mask_value,area)
     separators = np.load("coin_colours.npy")
 
@@ -175,6 +241,15 @@ def identifyColour(image,labeled,mask_value,area):
         return "red"
     
 def identifyCoins(image):
+    """Localizes and identifies the coins in an image
+    
+    :param str image: name of the image to be searched
+    :return:
+        list coins_list: a list containing the names of each coin, ie 2po for
+        2 pounds and 5pe for 5 penny. We know that it is not necessary to write
+        "pe" for penny and that it is clear enough to just write "5p", but it
+        is somewhat more practical that pounds and pence strings have the same length.
+        """
     im = cv2.imread(image)
     grey_im=cv2.cvtColor(im, cv2.COLOR_BGR2GRAY )
 
@@ -191,11 +266,7 @@ def identifyCoins(image):
     colours_normalized = colours/colours_ranges
     font = cv2.FONT_HERSHEY_SIMPLEX   
     for i in range(len(coin_labels)):
-        color=identifyColour(im, labeled, coin_labels[i],areas[i])
-        print color
-        coin = identify_from_size(areas[0],color)
-        print coin
-        coins_list.append(coin)
+           
         
         current_color_score = colour_score.colour_score(im,labeled,coin_labels[i],areas[i])/colours_ranges
         current_area_score = areas[i]/sizes_range
@@ -203,7 +274,7 @@ def identifyCoins(image):
         index = np.argmin(res)
     
         coin = coins[index]
-        
+        coins_list.append(coin)
         (x,y)=centroid(labeled,coin_labels[i])
         cv2.putText(im,coin,(y,x), font, 1,(0,255,0),2,cv2.LINE_AA)
 

@@ -12,6 +12,15 @@ FILE_NAME = "inFocus pictures/6.png"
 srcImg = cv2.imread(FILE_NAME)
 
 def colour_score(BGRImg, segmentMask, mask_value,area):
+    """Computes the colour score of an object in an image, corresponding to its
+    mean saturation value.
+    
+    :param np.ndarray BGRImg: the source image
+    :param np.ndarray segmentMask: segmented image
+    :param int mask_value: identifier of the object of interest in segmentMask
+    :param int area: area in pixels of the region of interest.
+    :return:
+        float mean_saturation: the average saturation in the object"""
     # segmentMask must contain 0s for background and mask_value for object pixels
     # Equalize histogram of the color camera image to compensate for occasional poor lighting conditions
     spRadius = 3
